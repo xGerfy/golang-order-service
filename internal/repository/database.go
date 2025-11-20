@@ -40,7 +40,6 @@ func (p *DB) Close() {
 	p.pool.Close()
 }
 
-// 🔥 ИСПРАВЛЕНО: Добавлен ctx как параметр
 func (p *DB) SaveOrder(ctx context.Context, order *models.Order) error {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
@@ -97,7 +96,6 @@ func (p *DB) SaveOrder(ctx context.Context, order *models.Order) error {
 	return tx.Commit(ctx)
 }
 
-// 🔥 ИСПРАВЛЕНО: Добавлен ctx как параметр
 func (p *DB) GetOrder(ctx context.Context, orderUID string) (*models.Order, error) {
 	query := `
 		SELECT 
@@ -157,7 +155,6 @@ func (p *DB) GetOrder(ctx context.Context, orderUID string) (*models.Order, erro
 	return &order, nil
 }
 
-// 🔥 ИСПРАВЛЕНО: Добавлен ctx как параметр
 func (p *DB) GetAllOrders(ctx context.Context) (map[string]*models.Order, error) {
 	rows, err := p.pool.Query(ctx, `SELECT order_uid FROM orders`)
 	if err != nil {
@@ -172,7 +169,7 @@ func (p *DB) GetAllOrders(ctx context.Context) (map[string]*models.Order, error)
 			continue
 		}
 
-		order, err := p.GetOrder(ctx, orderUID) // 🔥 Передаем ctx
+		order, err := p.GetOrder(ctx, orderUID)
 		if err != nil {
 			log.Printf("Ошибка загрузки заказа %s: %v", orderUID, err)
 			continue
@@ -184,7 +181,6 @@ func (p *DB) GetAllOrders(ctx context.Context) (map[string]*models.Order, error)
 	return orders, nil
 }
 
-// 🔥 ИСПРАВЛЕНО: Используем переданный ctx
 func (p *DB) HealthCheck(ctx context.Context) error {
 	return p.pool.Ping(ctx)
 }

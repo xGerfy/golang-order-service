@@ -14,12 +14,12 @@ import (
 )
 
 type Service struct {
-	repo     repository.OrderRepository // 🔥 Без указателя
-	cache    repository.OrderCache      // 🔥 Без указателя (используем Cache, а не OrderCache)
+	repo     repository.OrderRepository
+	cache    repository.OrderCache
 	validate *validator.Validate
 }
 
-func New(repo repository.OrderRepository, cache repository.OrderCache) *Service { // 🔥 Без указателей
+func New(repo repository.OrderRepository, cache repository.OrderCache) *Service {
 	validate := validator.New(validator.WithRequiredStructEnabled())
 
 	svc := &Service{
@@ -44,7 +44,7 @@ func (s *Service) ProcessOrder(order *models.Order) error {
 	}
 
 	// Сохранение в бд
-	if err := s.repo.SaveOrder(ctx, order); err != nil { // 🔥 Добавлен ctx
+	if err := s.repo.SaveOrder(ctx, order); err != nil {
 		return err
 	}
 
@@ -85,7 +85,7 @@ func (s *Service) restoreCache() {
 	ctx := context.Background()
 	log.Println("Получение кэша из базы данных...")
 
-	orders, err := s.repo.GetAllOrders(ctx) // 🔥 Добавлен ctx
+	orders, err := s.repo.GetAllOrders(ctx)
 	if err != nil {
 		log.Printf("Ошибка получения кэша: %v", err)
 		return
