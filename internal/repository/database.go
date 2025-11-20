@@ -1,18 +1,21 @@
-package database
+package repository
 
 import (
 	"context"
 	"log"
+
 	"order-service/internal/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Postgres struct {
+var _ OrderRepository = (*DB)(nil)
+
+type DB struct {
 	pool *pgxpool.Pool
 }
 
-func New(connectionString string) (*Postgres, error) {
+func NewDB(connectionString string) (*DB, error) {
 	cfg, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
 		return nil, err
@@ -20,8 +23,6 @@ func New(connectionString string) (*Postgres, error) {
 
 	cfg.MaxConns = 10
 	cfg.MinConns = 1
-	cfg.MaxConnLifetime = 0
-	cfg.MaxConnIdleTime = 0
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
 	if err != nil {
@@ -32,52 +33,47 @@ func New(connectionString string) (*Postgres, error) {
 		return nil, err
 	}
 
-	return &Postgres{pool: pool}, nil
+	return &DB{pool: pool}, nil
 }
 
-func (p *Postgres) Close() {
+func (p *DB) Close() {
 	p.pool.Close()
 }
 
-func (p *Postgres) SaveOrder(order *models.Order) error {
-	ctx := context.Background()
-
-	// Начало транзакции
+// 🔥 ИСПРАВЛЕНО: Добавлен ctx как параметр
+func (p *DB) SaveOrder(ctx context.Context, order *models.Order) error {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	// Таблица order
-	orderQuery := `INSERT INTO orders (order_uid, track_number, entry, locale, internal_signature, 
-		customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
-
-	_, err = tx.Exec(ctx, orderQuery,
+	// Order
+	_, err = tx.Exec(ctx,
+		`INSERT INTO orders (order_uid, track_number, entry, locale, internal_signature, 
+		 customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard) 
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		order.OrderUID, order.TrackNumber, order.Entry, order.Locale, order.InternalSignature,
 		order.CustomerID, order.DeliveryService, order.Shardkey, order.SmID, order.DateCreated, order.OofShard)
 	if err != nil {
 		return err
 	}
 
-	// Таблица delivery
-	deliveryQuery := `INSERT INTO deliveries (order_uid, name, phone, zip, city, address, region, email)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
-
-	_, err = tx.Exec(ctx, deliveryQuery,
+	// Delivery
+	_, err = tx.Exec(ctx,
+		`INSERT INTO deliveries (order_uid, name, phone, zip, city, address, region, email)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		order.OrderUID, order.Delivery.Name, order.Delivery.Phone, order.Delivery.Zip,
 		order.Delivery.City, order.Delivery.Address, order.Delivery.Region, order.Delivery.Email)
 	if err != nil {
 		return err
 	}
 
-	// Таблица payment
-	paymentQuery := `INSERT INTO payments (order_uid, transaction, request_id, currency, provider, 
-		amount, payment_dt, bank, delivery_cost, goods_total, custom_fee)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
-
-	_, err = tx.Exec(ctx, paymentQuery,
+	// Payment
+	_, err = tx.Exec(ctx,
+		`INSERT INTO payments (order_uid, transaction, request_id, currency, provider, 
+		 amount, payment_dt, bank, delivery_cost, goods_total, custom_fee)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		order.OrderUID, order.Payment.Transaction, order.Payment.RequestID, order.Payment.Currency,
 		order.Payment.Provider, order.Payment.Amount, order.Payment.PaymentDt, order.Payment.Bank,
 		order.Payment.DeliveryCost, order.Payment.GoodsTotal, order.Payment.CustomFee)
@@ -85,13 +81,12 @@ func (p *Postgres) SaveOrder(order *models.Order) error {
 		return err
 	}
 
-	// Таблица items
-	itemQuery := `INSERT INTO items (order_uid, chrt_id, track_number, price, rid, name, sale, size, 
-		total_price, nm_id, brand, status) 
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
-
+	// Items
 	for _, item := range order.Items {
-		_, err = tx.Exec(ctx, itemQuery,
+		_, err = tx.Exec(ctx,
+			`INSERT INTO items (order_uid, chrt_id, track_number, price, rid, name, sale, size, 
+			 total_price, nm_id, brand, status) 
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 			order.OrderUID, item.ChrtID, item.TrackNumber, item.Price, item.Rid, item.Name,
 			item.Sale, item.Size, item.TotalPrice, item.NmID, item.Brand, item.Status)
 		if err != nil {
@@ -102,9 +97,8 @@ func (p *Postgres) SaveOrder(order *models.Order) error {
 	return tx.Commit(ctx)
 }
 
-func (p *Postgres) GetOrder(orderUID string) (*models.Order, error) {
-	ctx := context.Background()
-
+// 🔥 ИСПРАВЛЕНО: Добавлен ctx как параметр
+func (p *DB) GetOrder(ctx context.Context, orderUID string) (*models.Order, error) {
 	query := `
 		SELECT 
 			o.order_uid, o.track_number, o.entry, o.locale, o.internal_signature,
@@ -131,7 +125,6 @@ func (p *Postgres) GetOrder(orderUID string) (*models.Order, error) {
 		&payment.Transaction, &payment.RequestID, &payment.Currency, &payment.Provider, &payment.Amount, &payment.PaymentDt,
 		&payment.Bank, &payment.DeliveryCost, &payment.GoodsTotal, &payment.CustomFee,
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -139,11 +132,10 @@ func (p *Postgres) GetOrder(orderUID string) (*models.Order, error) {
 	order.Delivery = delivery
 	order.Payment = payment
 
-	// Получение items
-	itemsQuery := `SELECT chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status 
-		FROM items WHERE order_uid = $1`
-
-	rows, err := p.pool.Query(ctx, itemsQuery, orderUID)
+	// Items
+	rows, err := p.pool.Query(ctx,
+		`SELECT chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status 
+		 FROM items WHERE order_uid = $1`, orderUID)
 	if err != nil {
 		return nil, err
 	}
@@ -152,29 +144,22 @@ func (p *Postgres) GetOrder(orderUID string) (*models.Order, error) {
 	var items []models.Item
 	for rows.Next() {
 		var item models.Item
-		err := rows.Scan(
+		if err := rows.Scan(
 			&item.ChrtID, &item.TrackNumber, &item.Price, &item.Rid, &item.Name, &item.Sale, &item.Size,
 			&item.TotalPrice, &item.NmID, &item.Brand, &item.Status,
-		)
-		if err != nil {
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 
 	order.Items = items
 	return &order, nil
 }
 
-func (p *Postgres) GetAllOrders() (map[string]*models.Order, error) {
-	ctx := context.Background()
-
-	query := `SELECT order_uid FROM orders`
-	rows, err := p.pool.Query(ctx, query)
+// 🔥 ИСПРАВЛЕНО: Добавлен ctx как параметр
+func (p *DB) GetAllOrders(ctx context.Context) (map[string]*models.Order, error) {
+	rows, err := p.pool.Query(ctx, `SELECT order_uid FROM orders`)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +172,7 @@ func (p *Postgres) GetAllOrders() (map[string]*models.Order, error) {
 			continue
 		}
 
-		order, err := p.GetOrder(orderUID)
+		order, err := p.GetOrder(ctx, orderUID) // 🔥 Передаем ctx
 		if err != nil {
 			log.Printf("Ошибка загрузки заказа %s: %v", orderUID, err)
 			continue
@@ -196,13 +181,10 @@ func (p *Postgres) GetAllOrders() (map[string]*models.Order, error) {
 		orders[orderUID] = order
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
 	return orders, nil
 }
 
-func (p *Postgres) HealthCheck() error {
-	return p.pool.Ping(context.Background())
+// 🔥 ИСПРАВЛЕНО: Используем переданный ctx
+func (p *DB) HealthCheck(ctx context.Context) error {
+	return p.pool.Ping(ctx)
 }

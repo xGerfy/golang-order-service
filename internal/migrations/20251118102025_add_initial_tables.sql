@@ -1,3 +1,5 @@
+-- +goose Up
+-- +goose StatementBegin
 CREATE TABLE
     IF NOT EXISTS orders (
         order_uid TEXT PRIMARY KEY NOT NULL,
@@ -55,3 +57,16 @@ CREATE TABLE
         brand TEXT NOT NULL,
         status INTEGER NOT NULL
     );
+
+-- +goose StatementEnd
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE items;
+
+DROP TABLE payments;
+
+DROP TABLE deliveries;
+
+DROP TABLE orders;
+
+-- +goose StatementEnd

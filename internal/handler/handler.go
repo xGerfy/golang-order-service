@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+
 	"order-service/internal/service"
 
 	"github.com/gorilla/mux"
@@ -25,7 +26,7 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, err := h.service.GetOrder(orderUID)
+	order, err := h.service.GetOrder(r.Context(), orderUID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -36,7 +37,7 @@ func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.HealthCheck(); err != nil {
+	if err := h.service.HealthCheck(r.Context()); err != nil {
 		http.Error(w, "Service unhealthy !!!", http.StatusServiceUnavailable)
 		return
 	}

@@ -27,7 +27,7 @@ func main() {
 
 	// Формируем тестовый заказ
 	testOrder := models.Order{
-		OrderUID:    "almazGOLOVA235",
+		OrderUID:    "testorder",
 		TrackNumber: "WBILMTESTTRACK",
 		Entry:       "WBIL",
 		Delivery: models.Delivery{

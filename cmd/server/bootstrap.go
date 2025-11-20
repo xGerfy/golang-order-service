@@ -2,20 +2,20 @@ package main
 
 import (
 	"log"
-	"order-service/internal/cache"
+
 	"order-service/internal/config"
-	"order-service/internal/database"
 	"order-service/internal/kafka"
+	"order-service/internal/repository"
 	"order-service/internal/service"
 )
 
-func setupComponents(cfg *config.Config) (*database.Postgres, *service.Service, *kafka.Consumer) {
-	db, err := database.New(cfg.DatabaseURL)
+func setupComponents(cfg *config.Config) (*repository.DB, *service.Service, *kafka.Consumer) {
+	db, err := repository.NewDB(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Ошибка подключения к бд: %v", err)
 	}
 
-	cache := cache.New()
+	cache := repository.NewCache(cfg.CacheCapacity)
 	svc := service.New(db, cache)
 	kafkaConsumer := kafka.New(cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID, svc)
 

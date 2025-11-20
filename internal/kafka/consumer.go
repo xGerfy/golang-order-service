@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
+
 	"order-service/internal/models"
 	"order-service/internal/service"
-	"time"
 
 	"github.com/segmentio/kafka-go"
 )
